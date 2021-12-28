@@ -26,7 +26,7 @@ def global_variable_init():
     #------SMC------#
     global passtime
     passtime = 0
-    global sliding_surface_x, sliding_surface_y, control_signal_x, control_signal_y, saturation_x, saturation_y, error_x_dot, error_y_dot
+    global sliding_surface_x, sliding_surface_y, control_signal_x, control_signal_y, saturation_x, saturation_y, error_x_dot, error_y_dot, control_signal_x_old
     sliding_surface_x = 0
     sliding_surface_y = 0
     control_signal_x = 0
@@ -35,6 +35,7 @@ def global_variable_init():
     saturation_y = 0
     error_x_dot = 0
     error_y_dot = 0
+    control_signal_x_old = 0
     #-----csv-----#
     global start_TIME,save_file_signal,camera_file_open,end_signal
     save_file_signal = False

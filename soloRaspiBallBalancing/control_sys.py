@@ -5,6 +5,7 @@ import math
 import time
 import csv
 import sympy
+import math
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPixmap, QFont
@@ -86,8 +87,13 @@ class control_servo:
         #the error should be in meter, so we need to convert error_x and error_y to meter
         # print(error_x, error_y)
 
-        error_x = error_y           #convert
-        error_x = error_x / 2000    #conversion to 
+        # error_x = error_y           #convert
+        # error_x = error_x / 2000    #conversion to 
+        
+
+
+        #for 1 dof diagonally
+        error_x = error_x / 2000
 
 
 
@@ -103,25 +109,35 @@ class control_servo:
            
         #2.1179    0.0081    4.7081   19.8914   50.3857
         # 4.3074   12.6504	5.8695   17.6218  207.3382
-        sigma1_x = 4.3074 #P
-        sigma2_x = 12.6504    #I
-        sigma3_x = 5.8695   #D
-        varphi_x = 17.6218
-        Kx = 207.3382
+
+        # 13.73711      1.517444      0.729935      254.3225      52.41114
+        # sigma1_x = 4.3074 #P
+        # sigma2_x = 12.6504    #I
+        # sigma3_x = 5.8695   #D
+        # varphi_x = 17.6218
+        # Kx = 207.3382
         
-        
-        
+        #13.73711      1.517444      0.729935      254.3225      52.41114 #1 dof diagonally reducedBES-best
+        #3.249445     0.1067807      5.121587      14.41063       267.021
+        #2.2369    0.0620    3.0671    3.2276   60.2545
+        sigma1_x = 2.2369  #P
+        sigma2_x = 0.0620   #I
+        sigma3_x = 3.0671    #D
+        varphi_x = 3.2276
+        Kx = 60.2545
         
 
         if globals.deltaTimeCounterInit < 10:
             deltaTime = 0
             errorx_1dev = 0
             deltaSum = 0
-            globals.deltaTimeCounterInit + 1
+            globals.deltaTimeCounterInit += 1
         else:
             deltaTime = (time.time() - globals.passtime)
             errorx_1dev = (error_x - globals.error_x_old) / deltaTime
             deltaSum = (globals.error_x_old + error_x)/2 * deltaTime
+
+        # print(globals.deltaTimeCounterInit)
         # print(deltaTime)
         # X-axis and Y-axis s plane sliding mode function
         # errorx_1dev = (error_x - globals.error_x_old) / deltaTime
@@ -153,6 +169,9 @@ class control_servo:
         # print(part2)
         # print(part3)
         # print("----")
+        p = error_x * sigma1_x
+        i = globals.sum_error_x * sigma2_x
+        d = errorx_1dev * sigma3_x
         s_x = error_x * sigma1_x + globals.sum_error_x * sigma2_x + errorx_1dev * sigma3_x
 
 
@@ -166,41 +185,49 @@ class control_servo:
         # SMC dynamic equation
         sat_x = np.clip(saturationInput, a_min = - 1, a_max = 1) 
         # sat_y = np.clip(s_y/varphi_y , a_min = - 1, a_max = 1) 
-        clippedSat_x = sat_x
+        # clippedSat_x = sat_x
 
         sat_x = Kx * sat_x
         globals.saturation_x = sat_x
         # globals.saturation_y = sat_y * Ky
+        # print("---")
         # print(sat_x)
         # sat_x = 0
         group1 = sigma1_x * errorx_1dev + sigma2_x * error_x + sat_x
         # print(sigma1_x * errorx_1dev + sigma2_x * error_x )
         # print(group1)
-        # globals.degree_x = 1/(sigma3_x*452.6367) * group1  #it is actually radian, so we need to convert it again to degree 
+        degree_x_noLimit = 1/(sigma3_x*0.4496) * group1 *180 / math.pi  #it is actually radian, so we need to convert it again to degree 
 
 
         # globals.degree_y = 1/(sigma3_y* 0.39) * (sigma1_y * errory_1dev + sigma2_y * error_y + Ky * sat_y)      
-        globals.degree_x =  group1 / 2
+        # globals.degree_x =  group1 / 2
         # globals.degree_y = 0
         # print("--")
-        # print(globals.degree_x)
+        # print(degree_x_noLimit)
 
 
-        number = 3
+        number = 30
 
         limitPos = number
         limitNeg = -number
             # time.sleep(1)   #test delay
-        if globals.degree_x > limitPos:
-            globals.degree_x = limitPos
-        if globals.degree_x < limitNeg:
-            globals.degree_x = limitNeg
+        if degree_x_noLimit > limitPos:
+            degree_x_noLimit = limitPos
+        if degree_x_noLimit < limitNeg:
+            degree_x_noLimit = limitNeg
+
+
         
+        globals.degree_x = degree_x_noLimit    #to motor, not plate
+        
+        print(degree_x_noLimit)
+        # print("%f %f %f %f %f %f"%(degree_x_noLimit, error_x, saturationInput, p, i, d))
+
         #in controller
         # print("1")
         # print(globals.degree_x)
         # print(" %f  %f" % (sat_x, sigma1_x * errorx_1dev + sigma2_x * error_x))
-        print("%f %f %f %f" % (globals.passtime, error_x, globals.degree_x, s_x))
+        # print("%f %f %f %f" % (globals.passtime, error_x, globals.degree_x, s_x))
         globals.control_signal_x = globals.degree_x
         globals.control_signal_y = globals.degree_y
 
@@ -225,10 +252,14 @@ class vision_servo(control_servo):
         dif_x = 0
         dif_y = 0
 
-        self.origin_x = 235 + dif_x
-        # self.origin_y = 207 + dif_y #original at center
-        # self.origin_y = 445
-        self.origin_y = 425  
+        # self.origin_x = 235 + dif_x
+        # # self.origin_y = 207 + dif_y #original at center
+        # # self.origin_y = 445
+        # self.origin_y = 425  
+        self.origin_x = 258
+        self.origin_y = 233
+
+
         self.last_measurement = np.array((2, 1), np.float32)
         self.current_measurement = np.array((2, 1), np.float32)
         self.last_predicition = np.zeros((2, 1), np.float32)
@@ -286,7 +317,7 @@ class vision_servo(control_servo):
             # startTime = time.time()
             ret, img = cam.read()
             # print("Camera Time : %s seconds" %(time.time() -  startTime))
-            img = img[:, 100:540]
+            img = img[:, 50:560]
             error_x, error_y = self.image_process(img, kalman)  # image processing, get the ball's position
 
             # print(error_x,error_y)
@@ -335,16 +366,20 @@ class vision_servo(control_servo):
             error_X,error_Y:the pixel difference between center and ball position
             """
         HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        lower = np.array([74,0,246])     #pingpong white
+        upper = np.array([179,242,255])
+
+
         # lower = np.array([0,110,153])     #pingpong
         # upper = np.array([99,240,255])
 
-        lower = np.array([0,0,181])     #metalball
-        upper = np.array([179,176,255])
+        # lower = np.array([0,0,181])     #metalball last used
+        # upper = np.array([179,176,255])
 
         #metalball update
         #0 95 0 240 229 255
-        lower = np.array([0,0,229])     #metalball
-        upper = np.array([95,240,255])
+        # lower = np.array([0,0,229])     #metalball
+        # upper = np.array([95,240,255])
 
         
         HSV_clip = cv2.inRange(HSV,lower,upper)
@@ -396,10 +431,17 @@ class vision_servo(control_servo):
         # half screen old
         # cv2.line(img, (0, 240), (640, 240), (0, 255, 0), 2)     
         # cv2.line(img, (240, 0), (240, 480), (0, 255, 0), 2)
-        cv2.line(img, (0, 235), (640, 235), (0, 255, 0), 2)     
-        cv2.line(img, (207, 0), (207, 480), (0, 255, 0), 2)
-        centerX= 207
-        centerY= 235 
+        # cv2.line(img, (0, 235), (640, 235), (0, 255, 0), 2)   #horizontal line
+        # cv2.line(img, (240, 0), (240, 480), (0, 255, 0), 2)     #vertical line top bottom
+        cv2.line(img, (0, 233), (640, 233), (0, 255, 0), 2)   #horizontal line
+        cv2.line(img, (258, 0), (258, 480), (0, 255, 0), 2)   #vertical line
+
+
+        # centerX= 207
+        # centerY= 235 
+        centerX= 258
+        centerY= 233 
+
         # centerY = #change y to 0.1, so the target become 0.1 from 0
         sideLength = 50
         cv2.rectangle(img, (centerX-sideLength, centerY-sideLength), (centerX+sideLength, centerY+sideLength), (255, 0, 0), 2)
@@ -410,6 +452,16 @@ class vision_servo(control_servo):
         # self.change_pixmap_signal.emit(img)
         error_x = self.origin_x - cX
         error_y = self.origin_y - cY
+        # print("%d, %d"%(cX, cY))
+        # print("%d, %d"%(error_x, error_y))
+
+        #for one degree of freedom
+        error_x = math.sqrt(error_x*error_x+error_y*error_y)
+        if error_y < 0:
+            error_x = -error_x
+
+        # print(error_x)
+        
 
         # print("position:(" + str(cX) + "," + str(cY) + ")")
 
@@ -519,22 +571,31 @@ def four_axis_convert():
 
 
 
+    #with transformation from alpha to theta
+    # # degree_x = -10
+    # # globals.degree_x = 0.44
+    # # print("In convert")
+    # # print("2")
+    # degree_x_send = globals.degree_x
+    # # print(degree_x_send)
+    # # degree_x_send = 0
+    # # globals.degree_x = globals.degree_x * 180 / math.pi
+    # degree_x_send = 2 * degree_x_send - 1  #regression
+    # theta_ID1 = 12.0 / 3.7 * degree_x_send
+    # # theta_ID1 = 0
+    # theta_ID2 = theta_ID1
 
-    # degree_x = -10
-    # globals.degree_x = 0.44
-    # print("In convert")
-    # print("2")
-    degree_x_send = globals.degree_x
-    # print(degree_x_send)
-    # degree_x_send = 0
-    # globals.degree_x = globals.degree_x * 180 / math.pi
-    degree_x_send = 2 * degree_x_send - 1  #regression
-    theta_ID1 = 12.0 / 3.7 * degree_x_send
-    # theta_ID1 = 0
-    theta_ID2 = theta_ID1
+    # theta_ID3 = - theta_ID1
+    # theta_ID4 = theta_ID3
+    # print(globals.degree_x)
+    theta_ID1 = globals.degree_x
+    theta_ID3 = -theta_ID1
+    theta_ID2 = 0
+    theta_ID4 = 0
 
-    theta_ID3 = - theta_ID1
-    theta_ID4 = theta_ID3
+    #no transformation
+
+
 
     
      

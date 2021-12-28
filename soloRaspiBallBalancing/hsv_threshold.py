@@ -39,8 +39,8 @@ def stackImages(scale,imgArray):
 
 # path = 'resources/image.png's
 cap = cv2.VideoCapture(0)
-cap.set(3, 360)
-cap.set(4, 480)
+# cap.set(3, 360)
+# cap.set(4, 480)
 
 
 

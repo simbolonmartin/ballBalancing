@@ -76,7 +76,7 @@ def RPI_communication(conn):
         # if(X[0]==0x01):
         #    print("get.")
         # time.sleep(0.001)
-        time.sleep(0.0001)
+        time.sleep(0.001)
 
 class extra_fn:
     """
