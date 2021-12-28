@@ -14,7 +14,119 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 class control_servo:
     """put control system algorithm over here.
        definition:PID&decision tree/SMC"""
- 
+
+    def tree_PID(self, error_x, error_y):
+        # parameter set
+        # kp_x = 0.028        
+        # kd_x = 0.0
+        # kp_y = 0.028
+        # ki_x = 0.001
+        # kd_y = 0.0
+        # ki_y = 0.001
+
+        kp_x = 0.028        
+        ki_x = 0.001
+        kd_x = 0.1
+        
+        kp_y = 0.028
+        ki_y = 0.001
+        kd_y = 0.1
+        
+        # decision tree: PID parameter adjustment
+        if ((error_x > -50 and error_x < 50) and (
+                error_y > -50 and error_y < 50) and globals.X_flag_innertoolong > 20 and globals.Y_flag_innertoolong > 20):
+            kp_x = 0.105
+            kp_y = 0.105
+            ki_x = 0.001
+            ki_y = 0.001
+            sum_error_x = 0
+            sum_error_y = 0
+            # print("in A")
+        elif ((error_x > -50 and error_x < 50) and (error_y > -50 and error_y < 50)):
+            globals.X_flag_innertoolong += 1
+            globals.Y_flag_innertoolong += 1
+            globals.X_flag = 0
+            globals.Y_flag = 0
+            # print("in B")
+
+        elif (error_x < -50 or error_x > 50):
+            globals.X_flag += 1
+            # print("in Cx")
+            if globals.X_flag > 25:
+                kp_x = 0.075
+                ki_x = 0.0
+                # print("C exceptX")
+        elif (error_y < -50 or error_y > 50):
+            globals.Y_flag += 1
+            # print("in Cy")
+            if globals.Y_flag > 25:
+                kp_y = 0.075
+                ki_y = 0.0
+                # print("C exceptY")
+
+        if (error_x < -80 or error_x > 80 or error_y < -80 or error_y > 80):
+            # print("in E")
+            globals.X_flag = 0
+            globals.Y_flag = 0
+            globals.X_flag_innertoolong = 0
+            globals.Y_flag_innertoolong = 0
+
+        globals.degree_x = (error_x) * kp_x + kd_x * (error_x - globals.error_x_old) + globals.sum_error_x * ki_x / 100.
+
+        globals.error_x_old = error_x  # save the past error data to retrieve in next time step
+        globals.sum_error_x = globals.sum_error_x + error_x
+        globals.degree_y = (error_y) * kp_y + kd_y * (error_y - globals.error_y_old) + globals.sum_error_y * ki_y / 100.
+        globals.error_y_old = error_y  # save the past error data to retrieve in next time step
+        globals.sum_error_y = globals.sum_error_y + error_y
+        globals.degree_x = globals.degree_x * 1.1  # sending degree adjustment
+        globals.degree_y = globals.degree_y * 1.08  # sending degree adjustment
+        # print("globals.degree_x, globals.degree_x")
+        # print(globals.degree_x, globals.degree_x)
+
+    def new_PID(self, error_x, error_y):
+        # initialization
+        # Ix = 0
+        # Iy = 0
+        
+        # PID parameter
+        kp_x = 3   
+        ki_x = 0.05
+        kd_x = 1
+        
+        kp_y = 2
+        ki_y = 0.01
+        kd_y = 1
+
+        # error conversion 
+        # print(error_x, error_y)
+        error_x = error_x / 50    
+        error_y = error_y / 50
+        # print(error_x, error_y)
+
+        # PID function
+        Px = kp_x*error_x
+        # Ix = Ix + ki_x * error_x * (time.time() - globals.passtime)
+        Ix = ki_x * globals.sum_error_x * ki_x #
+        Dx = kd_x*(error_x - globals.error_x_old)/(time.time() - globals.passtime)
+        PIDx = Px + Ix + Dx
+
+        Py = kp_y*error_y
+        # Iy = Iy + ki_y * error_y * (time.time() - globals.passtime)
+        Iy = ki_y * globals.sum_error_y * ki_y 
+        Dy = kd_y*(error_y- globals.error_y_old)/(time.time() - globals.passtime)
+        PIDy = Py + Iy + Dy
+
+        # send degree
+        globals.degree_x =PIDx
+        globals.degree_y = PIDy
+        # print(globals.degree_x, globals.degree_y)
+        
+        # update data
+        globals.error_x_old = error_x
+        globals.sum_error_x = globals.sum_error_x + error_x
+        globals.error_y_old = error_y 
+        globals.sum_error_y = globals.sum_error_y + error_y
+        globals.passtime = time.time()
 
 
     def Sliding_Mode_Control(self, error_x, error_y):
@@ -85,122 +197,57 @@ class control_servo:
     def Modified_Sliding_Mode_Control(self, error_x, error_y):
         #the error should be in meter, so we need to convert error_x and error_y to meter
         # print(error_x, error_y)
-
-        error_x = error_y           #convert
-        error_x = error_x / 2000    #conversion to 
-
-
-
-        # print(error_x)
-        # error_y = error_y / 2000        
+        error_x = error_x / 2000    #conversion to meter
+        error_y = error_y / 2000    
         # print(error_x, error_y)
-        # print("Error and Old")
-        # print(error_x)
-        # print(globals.error_x_old)
-
-        # error_x = 0
+        
         # print(error_x, error_y)
            
-        #2.1179    0.0081    4.7081   19.8914   50.3857
-        # 4.3074   12.6504	5.8695   17.6218  207.3382
-        sigma1_x = 4.3074 #P
-        sigma2_x = 12.6504    #I
-        sigma3_x = 5.8695   #D
-        varphi_x = 17.6218
-        Kx = 207.3382
         
-        
-        
-        
+        sigma1_x = 4.9976 #P
+        sigma2_x = 0.001    #I
+        sigma3_x = 0.07   #D
+        Kx = 55.4871
+        varphi_x = 9.85856
 
-        if globals.deltaTimeCounterInit < 10:
-            deltaTime = 0
-            errorx_1dev = 0
-            deltaSum = 0
-            globals.deltaTimeCounterInit + 1
-        else:
-            deltaTime = (time.time() - globals.passtime)
-            errorx_1dev = (error_x - globals.error_x_old) / deltaTime
-            deltaSum = (globals.error_x_old + error_x)/2 * deltaTime
-        # print(deltaTime)
+        
+        sigma1_y = 4.6179    #P
+        sigma2_y = 0.001   #I
+        sigma3_y = 0.03    #D
+        Ky = 150
+        varphi_y = 3.0029
+        # SMC algorithm
+        
         # X-axis and Y-axis s plane sliding mode function
-        # errorx_1dev = (error_x - globals.error_x_old) / deltaTime
-        # errory_1dev = (error_y - globals.error_y_old) / (time.time() - globals.passtime)
+        errorx_1dev = (error_x - globals.error_x_old) / (time.time() - globals.passtime)
+        errory_1dev = (error_y - globals.error_y_old) / (time.time() - globals.passtime)
         
         globals.error_x_dot = errorx_1dev
-        # globals.error_y_dot = errory_1dev
-
-        # print(deltaTime)
-        # deltaSum = (globals.error_x_old + error_x)/2 * deltaTime
-        # if globals.counterTestSumError == 0:
-        #     print("init")
-        #     print(globals.sum_error_x)
-        #     print(globals.error_x_old)
-        #     print(deltaSum)
-            
-        
-        globals.sum_error_x = globals.sum_error_x + (deltaSum) 
-        # globals.sum_error_y = globals.sum_error_y + ((globals.error_y_old + error_y)/2 * (time.time()-globals.passtime))
-        # if globals.counterTestSumError == 0:
-        #     print(globals.sum_error_x)  
-        # globals.counterTestSumError = 1
+        globals.error_y_dot = errory_1dev
 
 
-        # part1 = error_x * sigma1_x
-        # part2 = globals.sum_error_x * sigma2_x
-        # part3 = errorx_1dev * sigma3_x
-        # print(part1)
-        # print(part2)
-        # print(part3)
-        # print("----")
+        globals.sum_error_x = globals.sum_error_x + ((globals.error_x_old + error_x)/2 * (time.time()-globals.passtime)) 
+        globals.sum_error_y = globals.sum_error_y + ((globals.error_y_old + error_y)/2 * (time.time()-globals.passtime))
+
+
         s_x = error_x * sigma1_x + globals.sum_error_x * sigma2_x + errorx_1dev * sigma3_x
+        s_y = error_y * sigma1_y + globals.sum_error_y * sigma2_y + errory_1dev * sigma3_y 
+        globals.sliding_surface_x = s_x
+        globals.sliding_surface_y = s_y  
 
-
-        # s_y = error_y * sigma1_y + globals.sum_error_y * sigma2_y + errory_1dev * sigma3_y 
-        # globals.sliding_surface_x = s_x
-        # globals.sliding_surface_y = s_y  
-        # print(s_x)
-
-        saturationInput =s_x/varphi_x
-        # print(saturationInput)
         # SMC dynamic equation
-        sat_x = np.clip(saturationInput, a_min = - 1, a_max = 1) 
-        # sat_y = np.clip(s_y/varphi_y , a_min = - 1, a_max = 1) 
-        clippedSat_x = sat_x
+        sat_x = np.clip(s_x/varphi_x, a_min = - 1, a_max = 1) 
+        sat_y = np.clip(s_y/varphi_y , a_min = - 1, a_max = 1) 
 
-        sat_x = Kx * sat_x
-        globals.saturation_x = sat_x
-        # globals.saturation_y = sat_y * Ky
-        # print(sat_x)
-        # sat_x = 0
-        group1 = sigma1_x * errorx_1dev + sigma2_x * error_x + sat_x
-        # print(sigma1_x * errorx_1dev + sigma2_x * error_x )
-        # print(group1)
-        # globals.degree_x = 1/(sigma3_x*452.6367) * group1  #it is actually radian, so we need to convert it again to degree 
+        globals.saturation_x = sat_x * Kx
+        globals.saturation_y = sat_y * Ky
 
 
-        # globals.degree_y = 1/(sigma3_y* 0.39) * (sigma1_y * errory_1dev + sigma2_y * error_y + Ky * sat_y)      
-        globals.degree_x =  group1 / 2
-        # globals.degree_y = 0
-        # print("--")
-        # print(globals.degree_x)
+        globals.degree_x = 1/(sigma3_x* 7.9) * (sigma1_x * errorx_1dev + sigma2_x * error_x + Kx * sat_x) #it is actually radian, so we need to convert it again to degree later
+        globals.degree_y = 1/(sigma3_y* 0.39) * (sigma1_y * errory_1dev + sigma2_y * error_y + Ky * sat_y)      
+        # globals.degree_x = 0
+        globals.degree_y = 0 #test 1dof
 
-
-        number = 3
-
-        limitPos = number
-        limitNeg = -number
-            # time.sleep(1)   #test delay
-        if globals.degree_x > limitPos:
-            globals.degree_x = limitPos
-        if globals.degree_x < limitNeg:
-            globals.degree_x = limitNeg
-        
-        #in controller
-        # print("1")
-        # print(globals.degree_x)
-        # print(" %f  %f" % (sat_x, sigma1_x * errorx_1dev + sigma2_x * error_x))
-        print("%f %f %f %f" % (globals.passtime, error_x, globals.degree_x, s_x))
         globals.control_signal_x = globals.degree_x
         globals.control_signal_y = globals.degree_y
 
@@ -226,9 +273,7 @@ class vision_servo(control_servo):
         dif_y = 0
 
         self.origin_x = 235 + dif_x
-        # self.origin_y = 207 + dif_y #original at center
-        # self.origin_y = 445
-        self.origin_y = 425  
+        self.origin_y = 207 + dif_y
         self.last_measurement = np.array((2, 1), np.float32)
         self.current_measurement = np.array((2, 1), np.float32)
         self.last_predicition = np.zeros((2, 1), np.float32)
@@ -261,7 +306,6 @@ class vision_servo(control_servo):
         # drawing on the video frame
         cv2.circle(event, (int(cpx), int(cpy)), 3, (0, 255, 0), 6)
         cv2.rectangle(event, (cpx - 35, cpy - 35), (cpx + 35, cpy + 35), (0, 255, 0), 2)
-        # print(cpx, cpy) # print position
 
     def camera(self):
         # -----parameters initial------#
@@ -288,29 +332,25 @@ class vision_servo(control_servo):
             # print("Camera Time : %s seconds" %(time.time() -  startTime))
             img = img[:, 100:540]
             error_x, error_y = self.image_process(img, kalman)  # image processing, get the ball's position
-
             # print(error_x,error_y)
             # self.tree_PID(error_x,error_y)
             # self.new_PID(error_x,error_y)
-            # self.Sliding_Mode_Control(error_x, error_y)
-            self.Modified_Sliding_Mode_Control(error_x, error_y)
+            self.Sliding_Mode_Control(error_x, error_y)
+            # self.Modified_Sliding_Mode_Control(error_x, error_y)
 
-            # number = 1
-
-            # limitPos = number
-            # limitNeg = -number
-            # # time.sleep(1)   #test delay
-            # if globals.degree_x > limitPos:
-            #     globals.degree_x = limitPos
-            # if globals.degree_x < limitNeg:
-            #     globals.degree_x = limitNeg
-            # if globals.degree_y > limitPos:
-            #     globals.degree_y = limitPos
-            # if globals.degree_y < limitNeg:
-            #     globals.degree_y = limitNeg
+            limitPos = 0.10472
+            limitNeg = -0.10472
+            # time.sleep(1)   #test delay
+            if globals.degree_x > limitPos:
+                globals.degree_x = limitPos
+            if globals.degree_x < limitNeg:
+                globals.degree_x = limitNeg
+            if globals.degree_y > limitPos:
+                globals.degree_y = limitPos
+            if globals.degree_y < limitNeg:
+                globals.degree_y = limitNeg
 
             # print("After:")
-            # print(globals.degree_x)
             # print(globals.degree_x, globals.degree_y)
             
 
@@ -340,13 +380,6 @@ class vision_servo(control_servo):
 
         lower = np.array([0,0,181])     #metalball
         upper = np.array([179,176,255])
-
-        #metalball update
-        #0 95 0 240 229 255
-        lower = np.array([0,0,229])     #metalball
-        upper = np.array([95,240,255])
-
-        
         HSV_clip = cv2.inRange(HSV,lower,upper)
 
         # HSV_clip = np.clip(HSV[..., 2], 88, 255)
@@ -391,16 +424,13 @@ class vision_servo(control_servo):
         cv2.circle(img, (int(cX), int(cY)), 3, (255, 0, 0), 6)
         cv2.rectangle(img, (int(cX - 35), int(cY - 35)), (int(cX + 35), int(cY + 35)), (255, 0, 0), 2)
         self.ball_predict(img, cX, cY, kalman)
-
-        # print(cY)
         # half screen old
         # cv2.line(img, (0, 240), (640, 240), (0, 255, 0), 2)     
         # cv2.line(img, (240, 0), (240, 480), (0, 255, 0), 2)
         cv2.line(img, (0, 235), (640, 235), (0, 255, 0), 2)     
         cv2.line(img, (207, 0), (207, 480), (0, 255, 0), 2)
         centerX= 207
-        centerY= 235 
-        # centerY = #change y to 0.1, so the target become 0.1 from 0
+        centerY= 235
         sideLength = 50
         cv2.rectangle(img, (centerX-sideLength, centerY-sideLength), (centerX+sideLength, centerY+sideLength), (255, 0, 0), 2)
 
@@ -456,26 +486,26 @@ def four_axis_convert():
     """
     # X_long = 24 / 2
     # Y_long = 24 / 2
-    # # change to degree(preset is rad)
-    # """cos_thetaY = math.cos(degree_y*math.pi/180)
-    # sin_thetaY = math.sin(degree_y*math.pi/180)
-    # cos_thetaX = math.cos(degree_x*math.pi/180)
-    # sin_thetaX = math.sin(degree_x*math.pi/180)"""
+    # change to degree(preset is rad)
+    """cos_thetaY = math.cos(degree_y*math.pi/180)
+    sin_thetaY = math.sin(degree_y*math.pi/180)
+    cos_thetaX = math.cos(degree_x*math.pi/180)
+    sin_thetaX = math.sin(degree_x*math.pi/180)"""
 
 
-    # #with conversion
+    #with conversion
     # cos_thetaY = math.cos(globals.degree_x * math.pi / 180)
     # sin_thetaY = math.sin(globals.degree_x * math.pi / 180)
     # cos_thetaX = math.cos(globals.degree_y * math.pi / 180)
     # sin_thetaX = math.sin(globals.degree_y * math.pi / 180)
 
-    # #without conversion
-    # # cos_thetaY = math.cos(globals.degree_x)
-    # # sin_thetaY = math.sin(globals.degree_x)
-    # # cos_thetaX = math.cos(globals.degree_y)
-    # # sin_thetaX = math.sin(globals.degree_y)
+    #without conversion
+    # cos_thetaY = math.cos(globals.degree_x)
+    # sin_thetaY = math.sin(globals.degree_x)
+    # cos_thetaX = math.cos(globals.degree_y)
+    # sin_thetaX = math.sin(globals.degree_y)
 
-    # # original string coordinate set-> can neglect at first, due to small angle changing.
+    # original string coordinate set-> can neglect at first, due to small angle changing.
     # # get Z -axis longtitude
     # X_forz = np.array([[12., -12.], [-12., 12.]])
     # Y_forz = np.array([[12., 12.], [-12., -12.]])
@@ -483,13 +513,13 @@ def four_axis_convert():
     # Z_2 = np.array([[0., 0.], [0., 0.]])  # original Z data
     
     
-    # # print("Z: data")
-    # # print(Z)
-    # # print(Z_2)
-    # # reckon the angle send to motor:
-    # """remenber, each motor has different preset of exchanging function
-    # ID1,ID4->0 degree, clockwise//ID2->0,degree, counterwise//ID3->180 degree, counterwise
-    # motor diameter:35 mm"""
+    # print("Z: data")
+    # print(Z)
+    # print(Z_2)
+    # reckon the angle send to motor:
+    """remenber, each motor has different preset of exchanging function
+    ID1,ID4->0 degree, clockwise//ID2->0,degree, counterwise//ID3->180 degree, counterwise
+    motor diameter:35 mm"""
     
     
     
@@ -514,30 +544,29 @@ def four_axis_convert():
     #     globals.counterDegree = 0
     #     degree_x = 0
 
+    degree_x = 10
+    # degree_x  = 2.02183 * degree_x - 0.81
     
-            
 
 
+    print("I am the new control_sys")
+    print(globals.counterDegree)
+    print(degree_x)
+    globals.counterDegree = globals.counterDegree + 1
 
+    
 
-    # degree_x = -10
-    # globals.degree_x = 0.44
-    # print("In convert")
-    # print("2")
-    degree_x_send = globals.degree_x
-    # print(degree_x_send)
-    # degree_x_send = 0
-    # globals.degree_x = globals.degree_x * 180 / math.pi
-    degree_x_send = 2 * degree_x_send - 1  #regression
-    theta_ID1 = 12.0 / 3.7 * degree_x_send
-    # theta_ID1 = 0
+    theta_ID1 = 12.0 / 3.7 * degree_x 
     theta_ID2 = theta_ID1
 
     theta_ID3 = - theta_ID1
     theta_ID4 = theta_ID3
 
-    
-     
+
+    # theta_ID1 = 6.216 
+    # theta_ID2 = -6.216 
+    # theta_ID3 = -6.216  
+    # theta_ID4 = 6.216  
 
     # origin motor set changing:
     theta_ID1 = -theta_ID1
