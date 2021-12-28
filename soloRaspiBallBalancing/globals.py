@@ -42,5 +42,11 @@ def global_variable_init():
     end_signal = False
     #-----ethernet setting-----#
     global ip_type
+    global counterDegree
+    global counterTestSumError
+    counterTestSumError = 0
+    counterDegree  = 0
     ip_type = 0
     print("initial done.")
+    global deltaTimeCounterInit
+    deltaTimeCounterInit = 0 
